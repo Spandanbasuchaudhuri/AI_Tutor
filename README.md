@@ -91,7 +91,7 @@ Unnati/
 
 ## System Requirements
 - **GPU:** NVIDIA RTX 3050 or higher recommended
-- **Memory:** 20GB RAM or more
+- **Memory:** 12GB RAM or more
 - **Storage:** Adequate storage space for datasets, user information, and generated content
 
 ## Contribution
