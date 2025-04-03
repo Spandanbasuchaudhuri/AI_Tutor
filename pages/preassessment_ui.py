@@ -87,9 +87,13 @@ if os.path.exists(user_file):
         st.write(f"**Completed on:** {preassessment_data['date']}")
         
         if st.button("Retake Assessment"):
-            # Reset session state and continue to the test
+            # Remove preassessment data from the JSON file
+            user_data.pop("preassessment", None)
+            with open(user_file, "w") as f:
+                json.dump(user_data, f, indent=4)
+            # Reset session state and reload the test
             st.session_state.preassessment_answers = {}
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.stop()
 
@@ -114,7 +118,7 @@ for i, q in enumerate(selected_questions, start=1):
         f"D: {option_d}"
     ]
     
-    # Use radio button for selection with cleaner key
+    # Use radio button for selection with a unique key
     selected_answer = st.radio("Select your answer:", options, key=f"pa_q{i}")
     
     # Extract just the letter (A, B, C, D) from the user's selection
@@ -207,7 +211,7 @@ if st.button("Submit Preassessment"):
     if "user_profile" in st.session_state:
         st.session_state.user_profile["course_difficulty"] = difficulty
     
-    # Display results in a more visually appealing way
+    # Display results in a visually appealing way
     st.success(f"Test completed! Your score: {score} out of {num_questions} ({percentage:.1f}%)")
     st.info(f"Recommended Course Difficulty: {difficulty}")
     st.success("Your results have been saved to your user profile.")

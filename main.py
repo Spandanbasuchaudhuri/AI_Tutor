@@ -18,7 +18,7 @@ menu = render_sidebar()
 username = st.session_state.username
 user_courses_root = os.path.join("users", username, "courses")
 
-st.title("📘 Course Outline Generator (Gemma 2B via Ollama)")
+st.title("📘 Course Outline Generator")
 
 course_topic = st.text_input("Enter the course topic:", "Data Structures & Algorithms")
 generate_button = st.button("🎯 Generate Outline")
