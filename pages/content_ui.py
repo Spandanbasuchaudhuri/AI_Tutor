@@ -1,16 +1,14 @@
-# pages/content_ui.py
 import streamlit as st
-
-# Set page config first
-st.set_page_config(page_title="Course Content Generator", layout="centered")
-
 import os
 import re
 import csv
 import ollama
-import matplotlib.pyplot as plt
+import json
 from datetime import datetime
 from course_content_gen import generate_module_content
+
+# Set page config first
+st.set_page_config(page_title="Course Content Generator", layout="centered")
 
 # Ensure the user is logged in.
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -23,14 +21,26 @@ menu = render_sidebar()
 
 username = st.session_state.username
 user_courses_root = os.path.join("users", username, "courses")
-st.title("Course Content Generator (Llama3 via Ollama)")
+st.title("Course Content Generator")
 
-# --- List available course topics ---
+# --- Option Selection using Two Buttons ---
+col1, col2 = st.columns(2)
+if col1.button("Continue Course"):
+    st.session_state.choice = "continue"
+if col2.button("Revise Content"):
+    st.session_state.choice = "revise"
+
+# Wait for user to choose an option.
+if "choice" not in st.session_state:
+    st.info("Please select an option above to continue.")
+    st.stop()
+
+# --- List available course topics (common to both flows) ---
 if not os.path.exists(user_courses_root):
     st.error("No courses folder found. Please generate and save an outline first.")
     st.stop()
 
-available_courses = [name for name in os.listdir(user_courses_root) 
+available_courses = [name for name in os.listdir(user_courses_root)
                      if os.path.isdir(os.path.join(user_courses_root, name))]
 if not available_courses:
     st.error("No courses found in your courses folder. Please generate and save an outline first.")
@@ -47,7 +57,7 @@ if not os.path.exists(outline_filename):
 with open(outline_filename, "r", encoding="utf-8") as f:
     outline_text = f.read()
 
-# --- Parse modules from the outline ---
+# --- Parse modules from the outline (common for both flows) ---
 modules_pattern = re.findall(
     r'(?i)^[*\s]*(?:module|unit|chapter)\s*\d*[\s:-]*\s*(.+)', 
     outline_text, 
@@ -82,134 +92,158 @@ if not modules:
     st.error("No modules available for content generation.")
     st.stop()
 
-# --- Compute Course Progress ---
-user_scores_root = os.path.join("users", username, "scores")
-os.makedirs(user_scores_root, exist_ok=True)
-progress_csv = os.path.join(user_scores_root, "completed_modules.csv")
-completed_modules = set()
-if os.path.exists(progress_csv):
-    with open(progress_csv, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row["Course Name"] == selected_course and row["Module Completion Status"] == "Completed":
-                completed_modules.add(row["Module Name"])
-total_modules = len(modules)
-def create_donut_chart(completed, total):
-    progress = completed / total if total > 0 else 0
-    sizes = [completed, total - completed]
-    fig, ax = plt.subplots(figsize=(2, 2))
-    wedges, _ = ax.pie(sizes, startangle=90, counterclock=False, wedgeprops=dict(width=0.3, edgecolor='white'))
-    ax.axis("equal")
-    ax.text(0, 0, f"{progress*100:.0f}%", ha="center", va="center", fontsize=12, color="black")
-    return fig
+# --- Branch Based on the User's Choice ---
+if st.session_state.choice == "continue":
+    st.markdown("## Continue Course")
+    # --- Determine next module based on completed modules ---
+    user_scores_root = os.path.join("users", username, "scores")
+    os.makedirs(user_scores_root, exist_ok=True)
+    progress_csv = os.path.join(user_scores_root, "completed_modules.csv")
+    completed_modules = set()
+    if os.path.exists(progress_csv):
+        with open(progress_csv, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row["Course Name"] == selected_course and row["Module Completion Status"] == "Completed":
+                    completed_modules.add(row["Module Name"])
 
-progress_fig = None
-if total_modules > 0:
-    progress_fig = create_donut_chart(len(completed_modules), total_modules)
+    next_module_index = len(completed_modules) + 1
 
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.markdown(f"**Course:** {selected_course}")
-with col2:
-    if progress_fig is not None:
-        st.pyplot(progress_fig)
+    if next_module_index > len(modules):
+        st.info("Congratulations! All modules have been completed for this course.")
+        st.stop()
+    else:
+        next_module = modules[next_module_index - 1]
+        st.info(f"Next module to complete: {next_module}")
+        selected_module = next_module
+        module_index = next_module_index
+        st.session_state.selected_course = selected_course
+        st.session_state.selected_module = selected_module
+        st.session_state.course_folder = course_folder
 
-# Re-read progress CSV to enforce sequential progression.
-progress_csv = os.path.join(user_scores_root, "completed_modules.csv")
-completed_modules = set()
-if os.path.exists(progress_csv):
-    with open(progress_csv, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row["Course Name"] == selected_course:
-                completed_modules.add(row["Module Name"])
-next_module_index = len(completed_modules) + 1
+    st.markdown(f"**Module:** {selected_module}")
 
-if next_module_index > len(modules):
-    st.info("Congratulations! All modules have been completed for this course.")
-    st.stop()
-else:
-    next_module = modules[next_module_index - 1]
-    st.info(f"Next module to complete: {next_module}")
-    selected_module = next_module
-    module_index = next_module_index
-    st.session_state.selected_course = selected_course
-    st.session_state.selected_module = selected_module
-    st.session_state.course_folder = course_folder
+    # Retrieve course difficulty from saved user data.
+    user_data_file = os.path.join("users", "data", f"{username}.json")
+    if os.path.exists(user_data_file):
+        with open(user_data_file, "r", encoding="utf-8") as f:
+            user_data = json.load(f)
+        difficulty = user_data.get("course_difficulty", "Intermediate")
+    else:
+        difficulty = "Intermediate"
 
-st.markdown(f"**Module:** {selected_module}")
-
-if st.button("Generate Content for Next Module"):
-    st.session_state.module_content = ""
-    st.session_state.module_completed = False
-    content_placeholder = st.empty()
-    try:
-        for partial_content in generate_module_content(selected_module, selected_course):
-            st.session_state.module_content = partial_content
-            content_placeholder.markdown(st.session_state.module_content)
-        module_filename = os.path.join(course_folder, f"module_{module_index}_content.txt")
-        with open(module_filename, "w", encoding="utf-8") as f:
-            f.write(st.session_state.module_content)
-        st.success(f"Module content saved to: {module_filename}")
-        st.session_state.module_filename = module_filename
-        st.session_state.module_index = module_index
-    except Exception as e:
-        st.error(f"Error generating content: {str(e)}")
-
-if "module_filename" not in st.session_state:
+    # --- Button to display existing module content for the next module, if available ---
     expected_module_file = os.path.join(course_folder, f"module_{module_index}_content.txt")
     if os.path.exists(expected_module_file):
-        st.session_state.module_filename = expected_module_file
+        if st.button("Display Existing Module Content"):
+            with open(expected_module_file, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            st.markdown(file_content)
 
-if st.button("Mark Module as Completed"):
-    content_exists = False
-    if st.session_state.get("module_content") and st.session_state.module_content.strip():
-        content_exists = True
-    elif "module_filename" in st.session_state and os.path.exists(st.session_state.module_filename):
-        with open(st.session_state.module_filename, "r", encoding="utf-8") as f:
-            file_content = f.read()
-        if file_content.strip():
+    # --- Button to generate new content ---
+    if st.button("Generate Content for Next Module"):
+        st.session_state.module_content = ""
+        st.session_state.module_completed = False
+        content_placeholder = st.empty()
+        try:
+            for partial_content in generate_module_content(selected_module, selected_course, difficulty):
+                st.session_state.module_content = partial_content
+                content_placeholder.markdown(st.session_state.module_content)
+            module_filename = os.path.join(course_folder, f"module_{module_index}_content.txt")
+            with open(module_filename, "w", encoding="utf-8") as f:
+                f.write(st.session_state.module_content)
+            st.success(f"Module content saved to: {module_filename}")
+            st.session_state.module_filename = module_filename
+            st.session_state.module_index = module_index
+        except Exception as e:
+            st.error(f"Error generating content: {str(e)}")
+
+    if "module_filename" not in st.session_state:
+        if os.path.exists(expected_module_file):
+            st.session_state.module_filename = expected_module_file
+
+    if st.button("Mark Module as Completed"):
+        content_exists = False
+        if st.session_state.get("module_content") and st.session_state.module_content.strip():
             content_exists = True
-    if content_exists:
-        st.session_state.module_completed = True
-        st.success(f"Module '{selected_module}' marked as completed!")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        new_record = {
-            "Timestamp": timestamp,
-            "Course Name": selected_course,
-            "Module Name": selected_module,
-            "Module Completion Status": "Completed",
-            "Test Status": "Pending",
-            "Score": "",
-            "Total Questions": ""
-        }
-        records = []
-        if os.path.exists(progress_csv):
-            with open(progress_csv, "r", newline="", encoding="utf-8") as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    records.append(row)
-        updated = False
-        for r in records:
-            if r["Course Name"] == selected_course and r["Module Name"] == selected_module:
-                r.update(new_record)
-                updated = True
-                break
-        if not updated:
-            records.append(new_record)
-        with open(progress_csv, "w", newline="", encoding="utf-8") as csvfile:
-            fieldnames = ["Timestamp", "Course Name", "Module Name", "Module Completion Status", "Test Status", "Score", "Total Questions"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        elif "module_filename" in st.session_state and os.path.exists(st.session_state.module_filename):
+            with open(st.session_state.module_filename, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            if file_content.strip():
+                content_exists = True
+        if content_exists:
+            st.session_state.module_completed = True
+            st.success(f"Module '{selected_module}' marked as completed!")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            new_record = {
+                "Timestamp": timestamp,
+                "Course Name": selected_course,
+                "Module Name": selected_module,
+                "Module Completion Status": "Completed",
+                "Test Status": "Pending",
+                "Score": "",
+                "Total Questions": ""
+            }
+            records = []
+            if os.path.exists(progress_csv):
+                with open(progress_csv, "r", newline="", encoding="utf-8") as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        records.append(row)
+            updated = False
             for r in records:
-                writer.writerow(r)
-        st.success("Module completion status updated in CSV!")
-    else:
-        st.error("No module content available. Please generate content first.")
-
-if st.session_state.get("module_completed", False):
-    if st.button("Go to MCQ Test Page for this Module"):
-        if "module_filename" in st.session_state and os.path.exists(st.session_state.module_filename):
-            st.query_params(page="mcq")
+                if r["Course Name"] == selected_course and r["Module Name"] == selected_module:
+                    r.update(new_record)
+                    updated = True
+                    break
+            if not updated:
+                records.append(new_record)
+            with open(progress_csv, "w", newline="", encoding="utf-8") as csvfile:
+                fieldnames = ["Timestamp", "Course Name", "Module Name", "Module Completion Status", "Test Status", "Score", "Total Questions"]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for r in records:
+                    writer.writerow(r)
+            st.success("Module completion status updated in CSV!")
         else:
-            st.error("Module content file not found. Please generate content first.")
+            st.error("No module content available. Please generate content first.")
+
+    if st.session_state.get("module_completed", False):
+        if st.button("Go to MCQ Test Page for this Module"):
+            if "module_filename" in st.session_state and os.path.exists(st.session_state.module_filename):
+                st.query_params["page"] = "mcq"
+            else:
+                st.error("Module content file not found. Please generate content first.")
+
+elif st.session_state.choice == "revise":
+    st.markdown("## Revise Course Content")
+    # --- Revision Mode: Select a Module by Name to View its Saved Content ---
+    module_content_files = [f for f in os.listdir(course_folder) if re.match(r"module_\d+_content\.txt", f)]
+    if module_content_files:
+        # Sort files based on module number.
+        module_content_files.sort(key=lambda x: int(re.search(r"module_(\d+)_content\.txt", x).group(1)))
+        # Create list of tuples (module name, file name)
+        module_options = []
+        for f in module_content_files:
+            match = re.search(r"module_(\d+)_content\.txt", f)
+            if match:
+                module_num = int(match.group(1))
+                module_name = modules[module_num - 1] if module_num - 1 < len(modules) else f"Module {module_num}"
+                module_options.append((module_name, f))
+        display_names = [option[0] for option in module_options]
+        selected_module_name = st.selectbox("Select a module to review its content:", display_names)
+        selected_file = None
+        for name, file in module_options:
+            if name == selected_module_name:
+                selected_file = file
+                break
+        if st.button("Display Selected Module Content"):
+            if selected_file:
+                file_path = os.path.join(course_folder, selected_file)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                st.markdown(content)
+            else:
+                st.error("Selected module file not found.")
+    else:
+        st.info("No former module content found.")

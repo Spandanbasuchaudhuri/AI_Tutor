@@ -1,4 +1,3 @@
-# pages/preassessment_ui.py
 import streamlit as st
 import csv
 import os
@@ -18,10 +17,10 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.error("Please login to take the preassessment test.")
     st.stop()
 
-# Get the school level from the user's profile.
+# Get the school level and username from the user's profile.
 if "user_profile" in st.session_state and "school_level" in st.session_state.user_profile:
     school_level = st.session_state.user_profile["school_level"]
-    username = st.session_state.user_profile["username"]  # Get username for saving data
+    username = st.session_state.user_profile["username"]
 else:
     st.error("School level information not found in user profile.")
     st.stop()
@@ -58,7 +57,7 @@ if len(questions) == 0:
 # Select 50 questions for the preassessment if available; otherwise, use all.
 num_questions = 50
 if len(questions) > num_questions:
-    # Use seed based on username to ensure same questions for same user
+    # Use seed based on username to ensure the same questions for the same user.
     random.seed(username)
     selected_questions = random.sample(questions, num_questions)
 else:
@@ -68,7 +67,7 @@ else:
 if "preassessment_answers" not in st.session_state:
     st.session_state.preassessment_answers = {}
 
-# Check if user already has a saved preassessment
+# Check if the user already has saved preassessment results.
 user_data_dir = os.path.join("users", "data")
 os.makedirs(user_data_dir, exist_ok=True)
 user_file = os.path.join(user_data_dir, f"{username}.json")
@@ -77,7 +76,7 @@ if os.path.exists(user_file):
     with open(user_file, "r") as f:
         user_data = json.load(f)
         
-    # If user already completed preassessment, show their previous results
+    # If the user has already completed the preassessment, show their previous results.
     if "preassessment" in user_data:
         st.info("You have already completed the preassessment test.")
         preassessment_data = user_data["preassessment"]
@@ -87,11 +86,11 @@ if os.path.exists(user_file):
         st.write(f"**Completed on:** {preassessment_data['date']}")
         
         if st.button("Retake Assessment"):
-            # Remove preassessment data from the JSON file
+            # Remove preassessment data from the JSON file.
             user_data.pop("preassessment", None)
             with open(user_file, "w") as f:
                 json.dump(user_data, f, indent=4)
-            # Reset session state and reload the test
+            # Reset session state and reload the test.
             st.session_state.preassessment_answers = {}
             st.rerun()
         else:
@@ -99,13 +98,10 @@ if os.path.exists(user_file):
 
 st.markdown("### Answer the following questions:")
 for i, q in enumerate(selected_questions, start=1):
-    # Get the question text
     question_text = q.get('Question', '')
-    
-    # Display the question with a separator for better readability
     st.markdown(f"**Question {i}:** {question_text}")
     
-    # Extract options directly from the CSV
+    # Extract options directly from the CSV.
     option_a = q.get('Option A', '').strip() 
     option_b = q.get('Option B', '').strip()
     option_c = q.get('Option C', '').strip()
@@ -118,13 +114,10 @@ for i, q in enumerate(selected_questions, start=1):
         f"D: {option_d}"
     ]
     
-    # Use radio button for selection with a unique key
+    # Use a radio button for selection with a unique key.
     selected_answer = st.radio("Select your answer:", options, key=f"pa_q{i}")
-    
-    # Extract just the letter (A, B, C, D) from the user's selection
     st.session_state.preassessment_answers[i] = selected_answer.split(":")[0].strip().upper()
     
-    # Add a divider between questions for better readability
     st.markdown("---")
 
 if st.button("Submit Preassessment"):
@@ -135,13 +128,12 @@ if st.button("Submit Preassessment"):
     for i, q in enumerate(selected_questions, start=1):
         user_choice = st.session_state.preassessment_answers.get(i, "")
         
-        # Handle both potential column names for the correct answer
+        # Handle both potential column names for the correct answer.
         correct_answer = ""
         if "Answer Key" in q:
             correct_answer = q.get("Answer Key", "").strip().upper()
         elif "Correct Answer" in q:
             correct_answer = q.get("Correct Answer", "").strip().upper()
-            # Handle answers like "A)" format by extracting just the letter
             if len(correct_answer) > 1 and correct_answer[1] == ")":
                 correct_answer = correct_answer[0]
         
@@ -155,7 +147,6 @@ if st.button("Submit Preassessment"):
                 "Correct Answer": correct_answer
             })
             
-        # Store detailed results for each question
         detailed_results.append({
             "question_number": i,
             "question_text": q.get('Question', ''),
@@ -167,7 +158,7 @@ if st.button("Submit Preassessment"):
     percentage = (score / num_questions) * 100
     st.session_state.preassessment_score = percentage
 
-    # Determine course difficulty based on the percentage score
+    # Determine course difficulty based on the percentage score.
     if percentage < 40:
         difficulty = "Beginner"
     elif percentage < 70:
@@ -177,10 +168,9 @@ if st.button("Submit Preassessment"):
 
     st.session_state.course_difficulty = difficulty
     
-    # Save results to user file
+    # Save results to the user file.
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Create or load existing user data
     if os.path.exists(user_file):
         with open(user_file, "r") as f:
             user_data = json.load(f)
@@ -190,7 +180,6 @@ if st.button("Submit Preassessment"):
             "school_level": school_level,
         }
     
-    # Add preassessment data
     user_data["preassessment"] = {
         "score": percentage,
         "correct_answers": score,
@@ -200,23 +189,18 @@ if st.button("Submit Preassessment"):
         "detailed_results": detailed_results
     }
     
-    # Update course difficulty in user profile data
     user_data["course_difficulty"] = difficulty
     
-    # Save updated user data
     with open(user_file, "w") as f:
         json.dump(user_data, f, indent=4)
     
-    # Also update session state with course difficulty
     if "user_profile" in st.session_state:
         st.session_state.user_profile["course_difficulty"] = difficulty
     
-    # Display results in a visually appealing way
     st.success(f"Test completed! Your score: {score} out of {num_questions} ({percentage:.1f}%)")
     st.info(f"Recommended Course Difficulty: {difficulty}")
     st.success("Your results have been saved to your user profile.")
     
-    # Show incorrect answers for review if any
     if incorrect_answers:
         with st.expander("Review incorrect answers"):
             for item in incorrect_answers:

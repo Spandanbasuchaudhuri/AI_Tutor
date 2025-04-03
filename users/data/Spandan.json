@@ -1,12 +1,13 @@
 {
     "username": "Spandan",
     "school_level": "High School",
+    "course_difficulty": "Intermediate",
     "preassessment": {
-        "score": 34.0,
-        "correct_answers": 17,
+        "score": 40.0,
+        "correct_answers": 20,
         "total_questions": 50,
-        "difficulty": "Beginner",
-        "date": "2025-04-02 15:41:42",
+        "difficulty": "Intermediate",
+        "date": "2025-04-03 20:23:04",
         "detailed_results": [
             {
                 "question_number": 1,
@@ -326,9 +327,9 @@
             {
                 "question_number": 46,
                 "question_text": "Prime number?",
-                "user_answer": "A",
+                "user_answer": "B",
                 "correct_answer": "B",
-                "is_correct": false
+                "is_correct": true
             },
             {
                 "question_number": 47,
@@ -347,18 +348,17 @@
             {
                 "question_number": 49,
                 "question_text": "Most sides?",
-                "user_answer": "A",
+                "user_answer": "D",
                 "correct_answer": "D",
-                "is_correct": false
+                "is_correct": true
             },
             {
                 "question_number": 50,
                 "question_text": "Any number \u00d7 0 = ?",
-                "user_answer": "A",
+                "user_answer": "B",
                 "correct_answer": "B",
-                "is_correct": false
+                "is_correct": true
             }
         ]
-    },
-    "course_difficulty": "Beginner"
+    }
 }
