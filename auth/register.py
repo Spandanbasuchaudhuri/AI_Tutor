@@ -1,12 +1,7 @@
-# auth/register.py
 import csv
 import os
 
 def register_user(full_name, username, password, age, school_level):
-    """
-    Registers a new user. Returns (True, message) if successful or (False, error_message) if the username already exists.
-    Also creates a personal folder under the "users" directory with subdirectories for courses and scores.
-    """
     users_file = os.path.join(os.path.dirname(__file__), "users.csv")
     user_exists = False
     if os.path.exists(users_file):
@@ -20,10 +15,8 @@ def register_user(full_name, username, password, age, school_level):
         with open(users_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=["full_name", "username", "password", "age", "school_level"])
             writer.writeheader()
-    
     if user_exists:
         return False, "Username already exists"
-    
     with open(users_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["full_name", "username", "password", "age", "school_level"])
         writer.writerow({
@@ -33,10 +26,7 @@ def register_user(full_name, username, password, age, school_level):
             "age": age,
             "school_level": school_level
         })
-    
-    # Create a personal folder for the user with subdirectories.
     user_dir = os.path.join("users", username)
     os.makedirs(os.path.join(user_dir, "courses"), exist_ok=True)
     os.makedirs(os.path.join(user_dir, "scores"), exist_ok=True)
-    
     return True, "User registered successfully"
