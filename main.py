@@ -4,14 +4,12 @@ import sys
 from course_gen import generate_outline_stream
 from pages.sidebar import render_sidebar
 
-st.set_page_config(page_title="Unnati: Course Outline Generator", layout="centered")
+# Set page config first - this will be the only call in the entire app
+st.set_page_config(layout="wide", page_title="Unnati - Learning Platform")
 
-def main():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
-    if not st.session_state.logged_in:
-        st.warning("You are not logged in. Please log in first.")
-        st.stop()
+from pages.login_ui import display_login_ui
+
+def main_app():
     menu = render_sidebar()
     st.title("📘 Course Outline Generator (Gemma 2B via Ollama)")
     course_topic = st.text_input("Enter the course topic:", "Data Structures & Algorithms")
@@ -46,6 +44,16 @@ def main():
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(st.session_state.outline_text)
             st.success(f"Course outline saved as `{filename}`.")
+
+def main():
+    # Check login status and show appropriate UI
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+        
+    if not st.session_state.logged_in:
+        display_login_ui()
+    else:
+        main_app()
 
 if __name__ == "__main__":
     main()
